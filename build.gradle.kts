@@ -1,5 +1,4 @@
 plugins {
-    java
     application
     id("io.freefair.lombok") version "8.7.1"
     id("org.openjfx.javafxplugin") version "0.1.0"
@@ -24,7 +23,7 @@ javafx {
 }
 
 dependencies {
-    implementation("org.apache.commons:commons-csv:1.11.0")
+//    implementation("org.apache.commons:commons-csv:1.11.0")
 //    implementation(platform("com.fasterxml.jackson:jackson-bom:2.17.2"))
 //    implementation("org.controlsfx:controlsfx:11.2.1")
 //    implementation("com.google.guava:guava:33.2.1-jre")

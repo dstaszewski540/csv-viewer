@@ -1,19 +1,19 @@
 package com.github.stachu540;
 
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.cell.MapValueFactory;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.csv.CSVRecord;
 
 import java.io.File;
 import java.net.URL;
+import java.util.Map;
 import java.util.Objects;
 import java.util.ResourceBundle;
 
@@ -22,7 +22,7 @@ public class ViewerComponent implements Initializable {
 
     private final Stage stage;
     @FXML
-    TableView<CSVRecord> tableData;
+    TableView<Map<String, String>> tableData;
 
 
     @Override
@@ -42,14 +42,10 @@ public class ViewerComponent implements Initializable {
         File file = chooser.showOpenDialog(stage);
 
         if (file != null) {
-            CSVDialog dialog = new CSVDialog(file);
-            dialog.initOwner(stage);
+            CSVDialog dialog = new CSVDialog(file, stage);
             dialog.showAndWait().ifPresent(rtn -> {
-                tableData.getColumns().clear();
-                tableData.getColumns().setAll(
-                        rtn.getHeaderNames().stream().map(TableColumn<CSVRecord, String>::new).toList()
-                );
-                tableData.setItems(FXCollections.observableArrayList(rtn.getRecords()));
+                CSVDialog.inputData(tableData, rtn);
+                tableData.setItems(rtn);
             });
         }
     }

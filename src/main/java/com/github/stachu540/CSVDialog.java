@@ -4,55 +4,71 @@ import javafx.beans.property.*;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.collections.ObservableMap;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.MapValueFactory;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.text.TextAlignment;
-import javafx.util.Pair;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
+import javafx.stage.Stage;
+import javafx.util.converter.CharacterStringConverter;
+import lombok.NonNull;
 
-import java.io.*;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.util.*;
 
-public class CSVDialog extends Dialog<CSVParser> {
+public class CSVDialog extends Dialog<ObservableList<Map<String, String>>> {
     private final ReadOnlyObjectWrapper<File> file;
     private final BooleanProperty headers = new SimpleBooleanProperty(this, "headers", false);
-    private final Property<Charsets> charset = new SimpleObjectProperty<>(this, "charset", Charsets.WINDOWS_1252);
-    private final StringProperty separator = new SimpleStringProperty(this, "separator", ";");
-    private final ListProperty<CSVRecord> data = new SimpleListProperty<>(this, "data", FXCollections.observableArrayList());
-    private final MapProperty<Integer, String> headerNames = new SimpleMapProperty<>(FXCollections.observableHashMap());
+    private final Property<Charsets> charset = new SimpleObjectProperty<>(this, "charset", Charsets.getDefault());
+    private final Property<Character> separator = new SimpleObjectProperty<>(this, "separator", ';');
+    private final ListProperty<Map<String, String>> data = new SimpleListProperty<>(this, "data", FXCollections.emptyObservableList());
     private final BooleanProperty reload = new SimpleBooleanProperty(false);
 
-    public CSVDialog(File file) {
+    public CSVDialog(File file, Stage owner) {
+        initOwner(owner);
         this.file = new ReadOnlyObjectWrapper<>(Objects.requireNonNull(file));
 
         DialogPane pane = getDialogPane();
-        pane.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         pane.setContent(content());
         pane.setHeader(label());
-        setOnCloseRequest(e -> {
-            e.consume();
-            this.hide();
-        });
+        setTitle(((Label) pane.getHeader()).getText());
 
+        reload.addListener((_, _, v) -> {
+            if (v) {
+                tableView().refresh();
+            }
+        });
         headers.addListener(onChange());
         charset.addListener(onChange());
         separator.addListener(onChange());
+        setResultConverter(b -> {
+            if (b == ButtonType.OK) {
+                return data.get();
+            }
+            return null;
+        });
 
         update();
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static void inputData(TableView<Map<String, String>> table, ObservableList<Map<String, String>> data) {
+        table.getColumns().clear();
+        data.getFirst().keySet().forEach((k) -> {
+            TableColumn<Map<String, String>, String> col = new TableColumn<>(k);
+            col.setCellValueFactory(new MapValueFactory(k));
+            table.getColumns().add(col);
+        });
     }
 
     private Label label() {
@@ -89,38 +105,39 @@ public class CSVDialog extends Dialog<CSVParser> {
         GridPane.setColumnIndex(sepLabel, 0);
         // NODE
         TextField sep = new TextField();
-        sep.textProperty().bindBidirectional(separator);
-        sep.setPromptText(",");
+        sep.setTextFormatter(new TextFormatter<>(new CharacterStringConverter()));
+        sep.textProperty().bindBidirectional(separator, new CharacterStringConverter());
+        sep.setPromptText(separator.getValue().toString());
         GridPane.setRowIndex(sep, 0);
         GridPane.setColumnIndex(sep, 1);
         // END: Separator
 
-        // Charset
-        // Label
-        Label charLabel = new Label("Charset");
-        GridPane.setRowIndex(charLabel, 1);
-        GridPane.setColumnIndex(charLabel, 0);
-        //NODE
-        ChoiceBox<Charsets> ch = new ChoiceBox<>(FXCollections.observableArrayList(Charsets.values()));
-        ch.valueProperty().bindBidirectional(charset);
-        GridPane.setRowIndex(ch, 1);
-        GridPane.setColumnIndex(ch, 1);
-        // END: Charset
-
         // Headers
         // Label
         Label headerLabel = new Label("Has Headers");
-        GridPane.setRowIndex(headerLabel, 2);
+        GridPane.setRowIndex(headerLabel, 1);
         GridPane.setColumnIndex(headerLabel, 0);
         // NODE
         CheckBox header = new CheckBox();
         header.selectedProperty().bindBidirectional(headers);
-        GridPane.setRowIndex(header, 2);
+        GridPane.setRowIndex(header, 1);
         GridPane.setColumnIndex(header, 1);
         // END: Headers
 
+        // Charset
+        // Label
+        Label charLabel = new Label("Charset");
+        GridPane.setRowIndex(charLabel, 2);
+        GridPane.setColumnIndex(charLabel, 0);
+        //NODE
+        ChoiceBox<Charsets> ch = new ChoiceBox<>(FXCollections.observableArrayList(Charsets.values()));
+        ch.valueProperty().bindBidirectional(charset);
+        GridPane.setRowIndex(ch, 2);
+        GridPane.setColumnIndex(ch, 1);
+        // END: Charset
+
         // Table
-        TableView<CSVRecord> table = tableView();
+        TableView<Map<String, String>> table = tableView();
         GridPane.setRowIndex(table, 3);
         GridPane.setColumnIndex(table, 0);
         GridPane.setColumnSpan(table, 2);
@@ -132,41 +149,27 @@ public class CSVDialog extends Dialog<CSVParser> {
         return pane;
     }
 
-    private TableView<CSVRecord> tableView() {
-        TableView<CSVRecord> table = new TableView<>();
+    private TableView<Map<String, String>> tableView() {
+        TableView<Map<String, String>> table = new TableView<>();
         table.setEditable(false);
-        headerNames.addListener((_, _, v) -> {
-            List<TableColumn<CSVRecord, String>> cols = v.entrySet().stream().map(it -> {
-                boolean noKey = it.getValue().isBlank();
-                String key = (noKey) ? "COL_" + it.getKey() : it.getValue();
-                TableColumn<CSVRecord, String> col = new TableColumn<>(key);
-                col.setCellValueFactory(data -> {
-                    CSVRecord record = data.getValue();
-                    String value = (noKey) ? record.get(it.getKey()) : record.get(it.getValue());
-                    return new SimpleStringProperty(value);
-                });
-                return col;
-            }).toList();
-            table.getColumns().setAll(cols);
+        data.addListener((_, _, l) -> {
+            inputData(table, l);
         });
-        table.itemsProperty().bindBidirectional(data);
 
+        table.itemsProperty().bindBidirectional(data);
+        reload.addListener((_, _, r) -> {
+            if (r) {
+                table.refresh();
+            }
+        });
         return table;
     }
 
-    public MapProperty<Integer, String> headerNamesProperty() {
-        return headerNames;
-    }
-
-    public ObservableMap<Integer, String> getHeaderNames() {
-        return headerNamesProperty().get();
-    }
-
-    public ListProperty<CSVRecord> dataProperty() {
+    public ListProperty<Map<String, String>> dataProperty() {
         return data;
     }
 
-    public ObservableList<CSVRecord> getData() {
+    public ObservableList<Map<String, String>> getData() {
         return dataProperty().get();
     }
 
@@ -175,42 +178,59 @@ public class CSVDialog extends Dialog<CSVParser> {
         return (_, _, _) -> update();
     }
 
-    private void update() {
-        try (InputStream is = new FileInputStream(file.get())) {
-            try (Reader r = new BufferedReader(new InputStreamReader(is, charset.getValue().io))) {
-                CSVFormat.Builder builder = CSVFormat.DEFAULT.builder();
-                if (this.separator.isNotEmpty().get()) {
-                    builder.setDelimiter(this.separator.get());
-                }
-                try (CSVParser p = builder.build().parse(r)) {
-                    List<CSVRecord> records = p.stream().toList();
-                    System.out.println(records.size());
-                    List<String> headers = Arrays.stream(records.getFirst().values()).toList();
-                    if (this.headers.not().get()) {
-                        int colNumber = headers.size();
-                        headers = IntStream.range(0, colNumber)
-                                .mapToObj(_ -> "")
-                                .toList();
-                        records = records.subList(1, records.size() - 1);
-                    }
-                    final List<String> fh = headers;
-                    Map<Integer, String> headerMap = IntStream.range(0, headers.size())
-                            .mapToObj(i -> new Pair<>(i, fh.get(i)))
-                            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-                    this.headerNames.setValue(FXCollections.observableMap(headerMap));
-                    this.data.setAll(records);
-                    this.setResultConverter(b -> {
-                        if (b != ButtonType.OK) {
-                            return null;
-                        }
-                        return p;
-                    });
-                }
+    private void apply(boolean headers, char separator, Charset charset) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(file.getValue()), charset))) {
+            List<Map<String, String>> data = new ArrayList<>();
+            List<String> lines = new LinkedList<>(br.lines().toList());
+            String rawH = "";
+
+            if (headers) {
+                rawH = lines.getFirst();
+                lines.removeFirst();
             }
+
+            for (var l : lines) {
+                data.add(line(rawH, separator, l));
+            }
+            this.data.setValue(FXCollections.observableList(data));
         } catch (Exception e) {
-            e.printStackTrace();
             Dialogs.showError(e, getOwner());
         }
+    }
+
+    @NonNull
+    private Map<String, String> line(String rawH, char sep, String rawL) {
+        Map<String, String> d = new LinkedHashMap<>();
+        String[] h = {};
+        String[] split = {rawL};
+        if (sep != 0) {
+            String ch = Character.toString(sep);
+            split = rawL.split(ch);
+            if (!rawH.isEmpty()) {
+                h = rawH.split(ch);
+            }
+        } else {
+            if (!rawH.isEmpty()) {
+                h = new String[]{rawH};
+            }
+        }
+        for (var i = 0; i < split.length; i++) {
+            String hh;
+            try {
+                hh = h[i];
+            } catch (ArrayIndexOutOfBoundsException _) {
+                hh = "#COL_" + i;
+            }
+            d.put(hh, split[i]);
+        }
+        return d;
+    }
+
+    private void update() {
+        boolean headers = this.headers.get();
+        char sep = this.separator.getValue();
+        Charset charset = this.charset.getValue().toCharset();
+        apply(headers, sep, charset);
         reload.set(false);
     }
 }
