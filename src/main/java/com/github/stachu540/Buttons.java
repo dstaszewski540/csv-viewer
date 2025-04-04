@@ -25,6 +25,7 @@ public class Buttons {
 
     /**
      * Convert {@code {@linkplain ButtonType}} buttons to ordinal {@code {@linkplain Button}}
+     *
      * @param type the {@code {@linkplain ButtonType}}
      * @return converted to ordinal {@code {@linkplain Button}}
      */
