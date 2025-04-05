@@ -23,11 +23,11 @@ javafx {
 }
 
 dependencies {
-//    implementation("org.apache.commons:commons-csv:1.11.0")
-//    implementation(platform("com.fasterxml.jackson:jackson-bom:2.17.2"))
-//    implementation("org.controlsfx:controlsfx:11.2.1")
-//    implementation("com.google.guava:guava:33.2.1-jre")
-//    implementation("de.siegmar:fastcsv:3.2.0")
+    testImplementation(platform("org.junit:junit-bom:5.12.1"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("org.testfx:testfx-junit5:4.0.18")
+    testImplementation("org.hamcrest:hamcrest:3.0")
 }
 
 group = "com.github.stachu540"
