@@ -61,6 +61,50 @@ public class CSVDialog extends Dialog<ObservableList<Map<String, String>>> {
         update();
     }
 
+    public File getFile() {
+        return file.get();
+    }
+
+    public ReadOnlyObjectWrapper<File> fileProperty() {
+        return file;
+    }
+
+    public boolean isHeaders() {
+        return headersProperty().get();
+    }
+
+    public BooleanProperty headersProperty() {
+        return headers;
+    }
+
+    public void setHeaders(boolean headers) {
+        headersProperty().set(headers);
+    }
+
+    public Charsets getCharset() {
+        return charsetProperty().getValue();
+    }
+
+    public Property<Charsets> charsetProperty() {
+        return charset;
+    }
+
+    public void setCharset(Charsets charsets) {
+        charsetProperty().setValue(charsets);
+    }
+
+    public char getSeparator() {
+        return separatorProperty().getValue();
+    }
+
+    public void setSeparator(char separator) {
+        separatorProperty().setValue(separator);
+    }
+
+    public Property<Character> separatorProperty() {
+        return separator;
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static void inputData(TableView<Map<String, String>> table, ObservableList<Map<String, String>> data) {
         table.getColumns().clear();
